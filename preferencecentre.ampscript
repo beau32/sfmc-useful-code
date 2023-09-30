@@ -1,0 +1,385 @@
+<html>
+
+  <head>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    
+    .main {
+      float:left;
+      width:60%;
+      padding:0 20px;
+    }
+    .right {
+      background-color:#e5e5e5;
+      float:left;
+      width:20%;
+      padding:15px;
+      margin-top:7px;
+      text-align:center;
+    }
+    @media only screen and (max-width:620px) {
+      /* For mobile phones: */
+      .menu, .main, .right {
+        width:100%;
+      }
+    }
+    input[type=text], input[type=date], input[type=email],select {
+      width: 100%;
+      padding: 12px 20px;
+      margin: 8px 0;
+      display: inline-block;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    input[type=submit], button {
+      width: 100%;
+      background-color: #4CAF50;
+      color: white;
+      padding: 14px 20px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    input[type=submit]:hover, button:hover {
+      background-color: #45a049;
+    }
+
+    div {
+      border-radius: 5px;
+      background-color: #f2f2f2;
+      padding: 20px;
+    }
+</style>
+<script type="text/javascript">
+
+  $(document).ready(function(){
+    $('#HasOptedOutofEmail').change(function(e){
+      $('#substatus').val("true");
+    });
+  });
+
+
+</script>
+</head> 
+<body style="font-family:Verdana;color:#aaaaaa;">
+
+%%[
+
+var @foo, @debug, @updateSF,@updateDE, @sfobject
+set @foo = QueryParameter('foo')
+set @jobid = QueryParameter("jobid")
+
+set @debug = false
+set @updateSF = true
+set @updateDE = true
+set @masterDE ='Master Subscriber'
+set @sfobject = 'Contact'
+set @sfobject = 'Lead'
+set @subkey = "Contact ID"
+
+if (@debug) then
+  outputLine(concat("Encoded Subscriber Key: ", @foo))
+endif
+
+if not empty(@foo) then
+
+  set @tableValues = LOOKUPORDEREDROWS(@masterDE,0,"Email asc", @subkey, @foo)
+
+  set @rowCount = rowcount(@tableValues)
+
+  if @rowCount > 0 then
+
+    for @i = 1 to @rowCount do
+    var @Email, @BirthDate, @Phone, @HasOptedOutOfEmail, @lastname, @firstname
+      set @row = row(@tableValues, @i) /* get row based on counter */
+      set @Email = field(@row,"Email")
+      set @firstname = field(@row,"First Name")
+      set @lastname = field(@row,"Last Name")
+      set @BirthDate = field(@row,"Birth Date")
+      set @Phone = field(@row,"Phone")
+      set @HasOptedOutofEmail = field(@row,"HasOptedOutOfEmail")
+      
+    next @i
+
+    if (@debug) then
+      outputLine(concat("Subscriber Key: ", @foo))
+      outputLine(concat( "last name: ", @lastname))
+      outputLine(concat( "first name: ", @firstname))
+      outputLine(concat( "phone: ", @phone))
+      outputLine(concat( "email: ", @email))
+      outputLine(concat("BirthDate: ", @BirthDate))
+
+      var @boolean
+      IF (@HasOptedOutofEmail is null or @HasOptedOutofEmail == false) THEN
+        SET @boolean = "False"
+      ELSE
+        SET @boolean = "True"
+      ENDIF
+
+      outputLine(concat("HasOptedOutofEmail: ", @HasOptedOutofEmail))
+    endif
+
+  else
+   set @error = 'No Record Found'
+  endif
+
+  if RequestParameter("submitted") == true and empty(@error) then
+    var @updateSfRecord, @updateDeRecord, @substatus
+
+    set @firstname = RequestParameter('firstName')
+    set @lastname = RequestParameter('lastName')
+    set @email = RequestParameter('email')
+    set @BirthDate = RequestParameter('BirthDate')
+    set @Phone = RequestParameter('Phone')
+    set @HasOptedOutofEmail = RequestParameter('HasOptedOutofEmail')
+    set @substatus = RequestParameter('substatus')
+    
+    //form validation
+    if(IsEmailAddress(@email)==true) then set @error = 'Invalid Email Address'
+    if(RegExMatch(@firstname, '[a-z0-9A-Z\ ]*', 0, 'IgnoreCase', 'Multiline')) then set @error = 'Invalid First Name'
+    if(RegExMatch(@lastname, '[a-z0-9A-Z\ ]*', 0, 'IgnoreCase', 'Multiline')) then set @error = 'Invalid Last Name'
+
+    var @boolean
+    IF (@HasOptedOutofEmail is null or @HasOptedOutofEmail == false) THEN
+       SET @boolean = false
+    ELSE
+      SET @boolean = true
+    ENDIF
+
+    if (@debug) then
+      outputLine(concat("-------"))
+      outputLine(concat("last name: ", @lastname))
+      outputLine(concat("first name: ", @firstname))
+      outputLine(concat("phone: ", @phone))
+      outputLine(concat("email: ", @email))
+      outputLine(concat("BirthDate: ", @BirthDate))
+      outputLine(concat("substatus: ", @substatus))
+
+      outputLine(concat("HasOptedOutofEmail: ", @boolean))
+    endif
+
+    if empty(@error) and @updateDE then
+      
+      set @updateDeRecord = UpdateData(
+        @masterDE,1,
+        'Subscriber Key',@foo,
+        'First Name',@firstname,
+        'Last Name',@lastname,
+        "Phone", @Phone,
+        "BirthDate", @BirthDate,
+        "HasOptedOutofEmail", @HasOptedOutofEmail,
+        'Email',@email)
+      
+
+
+      if (@boolean =='false' and @substatus == 'true') then
+
+        var @Reason,@lue
+        set @Reason = "Unsubscribe from preference center"
+
+        SET @lue = CreateObject("ExecuteRequest")
+        SetObjectProperty(@lue,"Name","LogUnsubEvent")
+
+        SET @lue_prop = CreateObject("APIProperty")                 
+        SetObjectProperty(@lue_prop, "Name", "SubscriberKey")
+        SetObjectProperty(@lue_prop, "Value", @foo)
+        AddObjectArrayItem(@lue, "Parameters", @lue_prop)
+
+        SET @lue_prop = CreateObject("APIProperty")
+        SetObjectProperty(@lue_prop, "Name", "JobID")
+        SetObjectProperty(@lue_prop, "Value", @jobid)
+        AddObjectArrayItem(@lue, "Parameters", @lue_prop)
+
+        SET @lue_prop = CreateObject("APIProperty")
+        SetObjectProperty(@lue_prop, "Name", "Reason")
+        SetObjectProperty(@lue_prop, "Value", @Reason)
+        AddObjectArrayItem(@lue, "Parameters", @lue_prop)
+
+        var @overallStatus, @requestId
+
+        SET @lue_statusCode = InvokeExecute(@lue, @overallStatus, @requestId)
+        
+        if (@debug) then
+
+          outputLine(concat("LogUnsubEvent SubscriberKey: ", @foo))
+          outputLine(concat("LogUnsubEvent JobID: ", @jobid))
+          outputLine(concat("LogUnsubEvent Reason: ", @Reason))
+
+
+          SET @Response = Row(@lue_statusCode, 1)
+          SET @Status = Field(@Response,"StatusMessage")
+          SET @ErrorCode = Field(@Response,"ErrorCode")
+
+          if (@ErrorCode) then
+            outputLine(concat("Failed LogUnsubEvent: ", @ErrorCode))
+          else
+            outputLine(concat("Successful LogUnsubEvent: ", @Status))
+          endif
+
+          if (@updateDeRecord) then
+            outputLine(concat("Successful updateDE: ", @masterDE))
+          else
+            outputLine(concat("Error: ", @updateDeRecord))
+          endif
+        endif
+
+      endif
+    endif
+
+    
+    if (empty(@error) and @updateSF and length(@sfobject)) then
+      set @updateSfRecord = UpdateSingleSalesforceObject(@sfobject,@foo, 
+          "FirstName", @firstname,
+          "LastName", @lastname,
+          "Phone", @Phone,
+          "BirthDate", FormatDate(@BirthDate,"iso"),
+          "HasOptedOutofEmail", @boolean,
+          "Email", @email)
+
+          if (@debug) then
+            if (@updateSfRecord) then
+              outputLine(concat("Successful update: ", @sfobject))
+            else
+              outputLine(concat("Error: ", @updateDeRecord))
+            endif
+          endif
+
+    endif
+
+    if (empty(@error) and @updateSF and length(@sfobject2)) then
+      set @updateSfRecord = UpdateSingleSalesforceObject(@sfobject2,@foo, 
+          "FirstName", @firstname,
+          "LastName", @lastname,
+          "Phone", @Phone,
+          "BirthDate", FormatDate(@BirthDate,"iso"),
+          "HasOptedOutofEmail", @boolean,
+          "Email", @email)
+
+          if (@debug) then
+            if (@updateSfRecord) then
+              outputLine(concat("Successful update: ", @sfobject))
+            else
+              outputLine(concat("Error: ", @updateDeRecord))
+            endif
+          endif
+
+    endif
+    
+  endif
+
+
+
+else
+ set @error = 'Invalid query string!'
+
+endif
+
+]%%  
+
+<div style="background-color:#e5e5e5;padding:15px;">
+  <h2>Lavabox Preference Centre</h2>
+  <p>
+        this is a pre form header
+  </p>
+</div>
+
+%%[ if empty(@error) then ]%%
+
+<div class="error">
+    %%[ if @updateSfRecord == 1 then ]%%
+         <p>SF Record Updated</p>
+    %%[ elseif @updateSfRecord == 0 then ]%%
+      <p>SF Update Failed</p>
+    %%[ endif ]%%
+</div>
+<div style="overflow:auto">
+  
+  <div class="main">
+    <form id="newObjectform"  action="%%= RequestParameter('PAGEURL') =%%" method="post">
+     
+     
+      <div id="firstname" class="inputDiv">
+       <label for="firstname" class="inputLabel" >First Name: </label>
+       <input type="text" id="firstname" name="firstname" value="%%=v(@firstname)=%%" required maxlength="40">
+      </div>
+     
+      <div id="lastname" class="inputDiv">
+       <label for="lastname" class="inputLabel" >Last Name: </label>
+       <input type="text" id="lastname" name="lastname" value="%%=v(@lastname)=%%" required maxlength="40">
+      </div>
+     
+      <div id="phone" class="inputDiv">
+       <label for="phone" class="inputLabel" >Phone: </label>
+       <input type="text" id="phone" value="%%=v(@Phone)=%%" name="phone" required maxlength="40">
+      </div>
+
+      <div id="BirthDate" class="inputDiv">
+       <label for="BirthDate" class="inputLabel">Birth Date: </label>
+       <input type="date" id="BirthDate" value="%%=v(FormatDate(@BirthDate,'yyyy-MM-dd'))=%%" name="BirthDate" min="1930-01-01" max="%%=v(FormatDate(NOW(),'iso'))=%%">
+      </div>
+     
+      <div id="email" class="inputDiv">
+       <label for="email" class="inputLabel" >Email: </label>
+       <input type="email" id="email" value="%%=v(@Email)=%%" name="email" required maxlength="40" required pattern="^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$">
+      </div>
+     
+     
+      <h4>Subscribed to:</h4>
+     
+      <div id="attributeName" class="inputDiv">
+       <label for="name" class="inputLabel">Events: </label>
+       <input type="checkbox" class="inputBox" id="event" name="event">
+      </div>
+     
+      <div id="attributeValues" class="inputDiv">
+       <label for="attributeValue" class="inputLabel">Promotional: </label>
+       <input type="checkbox" class="inputBox" id="promotional" name="promotional">
+      </div>
+     
+      
+      <div id="elementValues" class="inputDiv">
+       <label for="elementValue" class="inputLabel">Value Club: </label>
+       <input type="checkbox" class="inputBox" id="valueclub" name="valueclub">
+      </div>
+     
+      <h4 id="vsp">Actions </h4>
+     
+      <div id="unsub" class="inputDiv">
+       <label for="unsub" class="inputLabel">Unsubscribe from all communications?</label>
+       <input type="checkbox" class="inputBox" id="unsub" name="unsub">
+      </div>
+      <div id="HasOptedOutofEmail" class="inputDiv">
+       <label for="emailunsub" class="inputLabel">Unsubscribe from all emails?</label>
+       <input type="checkbox" class="inputBox" id="HasOptedOutofEmail" name="HasOptedOutofEmail" value="true" %%[ if (@HasOptedOutofEmail) then ]%% checked %%[ else ]%% %%[ endif ]%%>
+      </div>
+      <div id="txtunsub" class="inputDiv">
+       <label for="txtunsub" class="inputLabel">Unsubscribe from all Txt messages?</label>
+       <input type="checkbox" class="inputBox" id="txtunsub" name="txtunsub">
+      </div>
+
+      <div id="buttonDiv" class="testClass">
+        <input name="substatus" type="hidden" value="" id='substatus'/>
+        <input name="submitted" type="hidden" value="true" />
+       <button class="button3" type="submit"> Submit </button>
+      </div>
+    </form>
+  </div>
+
+</div>
+%%[
+ELSE
+   outputLine(concat("Error Message: ", @error))
+ENDIF
+]%%
+<div style="background-color:#e5e5e5;padding:10px;margin-top:7px;">© copyright Lavabox</div>
+
+  
+  </body>
+</html>
