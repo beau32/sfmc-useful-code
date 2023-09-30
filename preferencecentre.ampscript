@@ -284,7 +284,7 @@ endif
 ]%%  
 
 <div style="background-color:#e5e5e5;padding:15px;">
-  <h2>Lavabox Preference Centre</h2>
+  <h2>Preference Centre</h2>
   <p>
         this is a pre form header
   </p>
@@ -378,7 +378,6 @@ ELSE
    outputLine(concat("Error Message: ", @error))
 ENDIF
 ]%%
-<div style="background-color:#e5e5e5;padding:10px;margin-top:7px;">© copyright Lavabox</div>
 
   
   </body>
