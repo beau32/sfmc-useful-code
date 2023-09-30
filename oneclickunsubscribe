@@ -1,0 +1,135 @@
+<html>
+
+%%[
+
+var @foo, @debug,@listDE, @updateDE, @sfobject,@jobid, @error
+set @foo = QueryParameter('foo')
+set @jobid = QueryParameter('jobid')
+set @debug = QueryParameter('d')
+
+set @masterDE = "MASTER DATA EXTENSION"
+set @listDE ="OneClicktoSubscribe"
+
+if (@debug) then
+  outputLine(concat("encoded Subscriber Key: ", @foo))
+endif
+  
+if not empty(@foo) then
+  set @foo = Base64Decode(@foo,'UTF-8',0)
+  set @tableValues = LOOKUPORDEREDROWS(@masterDE,0,"Email asc", "Id", @foo)
+else
+  set @error = "Subscriber Key Missing"
+endif
+
+set @rowCount = rowcount(@tableValues)
+
+if @rowCount > 0 then
+
+    for @i = 1 to @rowCount do
+      var @Email, @BirthDate, @MobilePhone, @HasOptedOutOfEmail, @LastName, @FirstName, @Status__c, @HasOptedOutofEmail, @isDeleted, @RecordTypeID,@Membership_type__c, @Reg_type, @MobilePhone, @Volunteer_Number, @Postal_Code, @Region_client, @Client_reg_status,@Volunteer_reg_status
+
+      set @row = row(@tableValues, @i) /* get row based on counter */
+      set @Email = field(@row,"Email")
+      set @FirstName = field(@row,"FirstName")
+      set @LastName = field(@row,"LastName")
+      set @Status__c = field(@row,"Status__c")
+      set @BirthDate = field(@row,"BirthDate")
+      set @HasOptedOutofEmail = field(@row,"HasOptedOutofEmail")
+      set @isDeleted = field(@row,"isDeleted")
+      set @RecordTypeID = field(@row,"RecordTypeID")
+      set @Membership_type__c = field(@row,"Membership_type__c")
+      set @Reg_type = field(@row,"Reg_type")
+      set @MobilePhone = field(@row,"MobilePhone")
+      set @Volunteer_Number = field(@row,"Volunteer_Number")
+      set @Postal_Code = field(@row,"Postal_Code")
+      set @Region_client = field(@row,"Region_client")
+      set @Client_reg_status = field(@row,"Client_reg_status")
+      set @Volunteer_reg_status = field(@row,"Volunteer_reg_status")
+
+
+      if (@debug) then
+        outputLine(concat("Subscriber Key: ", @foo))
+        outputLine(concat( "FirstName: ", @FirstName))
+        outputLine(concat( "LastName: ", @LastName))
+        outputLine(concat( "isDeleted: ", @isDeleted))
+        outputLine(concat( "Email: ", @Email))
+        outputLine(concat("BirthDate: ", @BirthDate))
+        outputLine(concat("RecordTypeID: ", @RecordTypeID))
+        outputLine(concat( "Membership_type__c: ", @Membership_type__c))
+        outputLine(concat( "Reg_type: ", @Reg_type))
+        outputLine(concat( "MobilePhone: ", @MobilePhone))
+        outputLine(concat( "Volunteer_Number: ", @Volunteer_Number))
+        outputLine(concat("Postal_Code: ", @Postal_Code))
+        outputLine(concat( "Region_client: ", @Region_client))
+        outputLine(concat( "Client_reg_status: ", @Client_reg_status))
+        outputLine(concat( "Volunteer_reg_status: ", @Volunteer_reg_status))
+                
+        outputLine(concat("JobID: ", @jobid))
+
+        var @boolean
+        IF (@HasOptedOutofEmail is null or @HasOptedOutofEmail == false) THEN
+          SET @boolean = "False"
+        ELSE
+          SET @boolean = "True"
+        ENDIF
+
+        outputLine(concat("HasOptedOutofEmail: ", @HasOptedOutofEmail))
+      endif
+      
+      set @updateDeRecord = UpsertData(
+        @listDE,1,
+          'Id', @foo,
+          "FirstName", @FirstName,
+          "LastName", @LastName,
+          "isDeleted", @isDeleted,
+          "Email", @Email,
+          "BirthDate", @BirthDate,
+          "RecordTypeID", @RecordTypeID,
+          "Membership_type__c", @Membership_type__c,
+          "Reg_type", @Reg_type,
+          "MobilePhone", @MobilePhone,
+          "Volunteer_Number", @Volunteer_Number,
+          'Postal_Code',@Postal_Code,
+          'Region_client',@Region_client,
+          'Client_reg_status',@Client_reg_status,
+          'Volunteer_reg_status',@Status__c,
+          'JobId',@jobid)
+      
+    next @i
+    
+else
+
+  set @error = 'No Record Found'
+
+endif
+  
+
+  ]%%
+
+  <head>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  
+  </head>
+  <body>
+
+%%[ 
+
+if @debug then
+  outputLine(concat("Row Count Message: ", @rowCount))
+  outputLine(concat("Error Message: ", @error))
+
+endif
+
+if empty(@error) then ]%%
+    <div id="success">
+      <p>
+        Thank you for subscribing to the newsletter.
+      </p>
+    </div>
+%%[
+ELSE
+   outputLine(concat("Error Message: ", @error))
+ENDIF
+]%%
+  </body>
+</html>
